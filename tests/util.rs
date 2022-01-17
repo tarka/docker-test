@@ -1,6 +1,7 @@
 
 
 use anyhow::Error;
+use camino::Utf8PathBuf as PathBuf;
 use libc;
 use std::env;
 use std::process::{Command, Output};
@@ -12,7 +13,6 @@ pub type Result<T> = result::Result<T, Error>;
 
 pub const BUILD_IMAGE: &str = "rust:1.58-slim-bullseye";
 pub const DOCKER_IMAGE: &str = "debian:bullseye-slim";
-pub const INST_BIN: &str = "/usr/bin/docker-test";
 pub const TESTUSER: &str = "testuser";
 pub const TESTPASS: &str = "testpass";
 
@@ -25,17 +25,34 @@ pub fn docker(cmd: Vec<&str>) -> Result<Output> {
 }
 
 pub struct Container {
-    id: String
+    src_bin: PathBuf,
+    dest_bin: PathBuf,
+    id: String,
 }
 
 impl Container {
-    pub fn new() -> Result<Self> {
-        let out = docker(vec!["run", "--detach", DOCKER_IMAGE, "sleep", "15m"])?;
-        let docker = Container {
-            id: String::from_utf8(out.stdout)?.trim().to_string()
+    pub fn new(src_bin: PathBuf) -> Result<Self> {
+        let running = docker(vec!["run", "--detach", DOCKER_IMAGE, "sleep", "15m"])?;
+
+        let bin = src_bin.components().last().unwrap();
+        let dest_base: PathBuf = PathBuf::from("/usr/local/bin");
+        let dest_bin = dest_base.join(bin);
+
+        let container = Container {
+            src_bin,
+            dest_bin,
+            id: String::from_utf8(running.stdout)?.trim().to_string()
         };
 
-        Ok(docker)
+        Ok(container)
+    }
+
+    pub fn src_str(&self) -> &str {
+        self.src_bin.as_str()
+    }
+
+    pub fn dest_str(&self) -> &str {
+        self.dest_bin.as_str()
     }
 
     pub fn kill(&self) -> Result<()> {
@@ -87,8 +104,7 @@ fn getids() -> (u32, u32) {
 
 static BUILD_LOCK: Once = Once::new();
 
-// FIXME: Could merge this with Container if we split this into a
-// crate, but not worth it ATM.
+// FIXME: Could merge this with Container, but not worth it ATM.
 fn build_in_container(target_ext: &str) -> Result<Output> {
     // See https://hub.docker.com/_/rust
     // docker run --rm --user "$(id -u)":"$(id -g)" -v "$PWD":/usr/src/myapp -w /usr/src/myapp rust:1.23.0 cargo build --release
@@ -114,31 +130,33 @@ fn build_in_container(target_ext: &str) -> Result<Output> {
     Ok(out)
 }
 
-fn build_target(features: &str) -> Result<String> {
+fn build_target(bin_name: &str, features: &str) -> Result<PathBuf> {
     let ext_base = "docker";
     let target_ext = if features == "" {
         format!("{ext_base}/default")
     } else {
         format!("{ext_base}/{}", features.replace(" ", "_"))
     };
-    let bin = format!("target/{target_ext}/release/docker-test");
 
     BUILD_LOCK.call_once(|| { build_in_container(&target_ext).unwrap(); } );
 
+    let bin = PathBuf::from(format!("target/{target_ext}/release/{bin_name}"));
     Ok(bin)
 }
 
-pub fn setup() -> Result<Container> {
-    let bin = build_target("")?;
+pub fn setup(bin_name: &str) -> Result<Container> {
+    let bin_path = build_target(bin_name, "")?;
 
-    let container = Container::new()?;
+    let container = Container::new(bin_path)?;
+
+    // FIXME: move to new?
     container.exec(vec!["adduser", "--disabled-password", TESTUSER])?;
     container.exec(vec!["echo", format!("{}\n{}\n", TESTPASS, TESTPASS).as_str(), "|", "passwd", TESTUSER])?;
     container.exec(vec!["addgroup", "--system", "sudoers"])?;
 
-    container.cp(bin.as_str(), INST_BIN)?;
-    container.exec(vec!["chown", "root.root", INST_BIN])?;
-    container.exec(vec!["chmod", "755", INST_BIN])?;
+    container.cp(container.src_bin.as_str(), container.dest_str())?;
+    container.exec(vec!["chown", "root.root", container.dest_str()])?;
+    container.exec(vec!["chmod", "755", container.dest_str()])?;
 
     Ok(container)
 }
