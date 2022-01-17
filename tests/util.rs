@@ -20,6 +20,10 @@ pub fn docker(cmd: Vec<&str>) -> Result<Output> {
     let out = Command::new("docker")
         .args(cmd)
         .output()?;
+    let stdout = String::from_utf8(out.clone().stdout).unwrap();
+    let stderr = String::from_utf8(out.clone().stderr).unwrap();
+    println!("STDOUT: {stdout}");
+    println!("STDERR: {stderr}");
     assert!(out.status.success());
     Ok(out)
 }
@@ -105,7 +109,7 @@ fn getids() -> (u32, u32) {
 static BUILD_LOCK: Once = Once::new();
 
 // FIXME: Could merge this with Container, but not worth it ATM.
-fn build_in_container(target_ext: &str) -> Result<Output> {
+fn build_in_container(target_ext: &str, features: &str) -> Result<Output> {
     // See https://hub.docker.com/_/rust
     // docker run --rm --user "$(id -u)":"$(id -g)" -v "$PWD":/usr/src/myapp -w /usr/src/myapp rust:1.23.0 cargo build --release
 
@@ -117,46 +121,47 @@ fn build_in_container(target_ext: &str) -> Result<Output> {
     let user = format!("{uid}:{gid}");
     let volume = format!("{pwd}:{builddir}");
     let cargo_env = format!("CARGO_HOME={target_base}/.cargo");
-    let cli = vec!["run", "--rm",
-                   "--user", user.as_str(),
-                   "--volume", volume.as_str(),
-                   "--workdir", builddir,
-                   "--env", cargo_env.as_str(),
-                   BUILD_IMAGE,
-                   "cargo", "build", "--release", "--target-dir", imgtarget.as_str()];
 
-    let out = docker(cli)?;
+    let cargo_cli = vec!["cargo", "build", "--release",
+                         "--features", features,
+                         "--target-dir", imgtarget.as_str()];
+
+    let docker_cli = vec!["run", "--rm",
+                          "--user", user.as_str(),
+                          "--volume", volume.as_str(),
+                          "--workdir", builddir,
+                          "--env", cargo_env.as_str(),
+                          BUILD_IMAGE];
+
+    let out = docker([docker_cli, cargo_cli].concat())?;
 
     Ok(out)
 }
 
-fn build_target(bin_name: &str, features: &str) -> Result<PathBuf> {
+fn build_target(bin_name: &str, features: Option<&str>) -> Result<PathBuf> {
     let ext_base = "docker";
-    let target_ext = if features == "" {
-        format!("{ext_base}/default")
-    } else {
-        format!("{ext_base}/{}", features.replace(" ", "_"))
-    };
+    let fstr = features.unwrap_or("");
+    let target_ext = format!("{ext_base}/{}", fstr.replace(" ", "_"));
 
-    BUILD_LOCK.call_once(|| { build_in_container(&target_ext).unwrap(); } );
+    BUILD_LOCK.call_once(|| { build_in_container(&target_ext, fstr).unwrap(); } );
 
     let bin = PathBuf::from(format!("target/{target_ext}/release/{bin_name}"));
     Ok(bin)
 }
 
-pub fn setup(bin_name: &str) -> Result<Container> {
-    let bin_path = build_target(bin_name, "")?;
+pub fn setup(bin_name: &str, features: Option<&str>) -> Result<Container> {
+    let bin_path = build_target(bin_name, None)?;
 
     let container = Container::new(bin_path)?;
 
     // FIXME: move to new?
-    container.exec(vec!["adduser", "--disabled-password", TESTUSER])?;
-    container.exec(vec!["echo", format!("{}\n{}\n", TESTPASS, TESTPASS).as_str(), "|", "passwd", TESTUSER])?;
-    container.exec(vec!["addgroup", "--system", "sudoers"])?;
-
     container.cp(container.src_bin.as_str(), container.dest_str())?;
     container.exec(vec!["chown", "root.root", container.dest_str()])?;
     container.exec(vec!["chmod", "755", container.dest_str()])?;
+
+    container.exec(vec!["adduser", "--disabled-password", TESTUSER])?;
+    container.exec(vec!["echo", format!("{}\n{}\n", TESTPASS, TESTPASS).as_str(), "|", "passwd", TESTUSER])?;
+    container.exec(vec!["addgroup", "--system", "sudoers"])?;
 
     Ok(container)
 }

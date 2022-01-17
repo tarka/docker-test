@@ -6,7 +6,7 @@ use crate::util::*;
 
 #[test]
 fn help() {
-    let container = setup("docker-test").unwrap();
+    let container = setup("docker-test", None).unwrap();
     let out = container.exec(vec![container.dest_str(), "--help"]).unwrap();
     let stdout = String::from_utf8(out.stdout).unwrap();
     assert!(out.status.success());
@@ -15,7 +15,7 @@ fn help() {
 
 #[test]
 fn not_root() {
-    let container = setup("docker-test").unwrap();
+    let container = setup("docker-test", None).unwrap();
     let out = container.exec_as(TESTUSER, vec![container.dest_str(), "/bin/ls"]).unwrap();
     assert!(!out.status.success());
     assert!(String::from_utf8(out.stderr).unwrap()
