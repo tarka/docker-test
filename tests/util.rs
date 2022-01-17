@@ -12,7 +12,7 @@ pub type Result<T> = result::Result<T, Error>;
 
 pub const BUILD_IMAGE: &str = "rust:1.58-slim-bullseye";
 pub const DOCKER_IMAGE: &str = "debian:bullseye-slim";
-pub const INST_BIN: &str = "/usr/bin/rsu";
+pub const INST_BIN: &str = "/usr/bin/docker-test";
 pub const TESTUSER: &str = "testuser";
 pub const TESTPASS: &str = "testpass";
 
@@ -121,7 +121,7 @@ fn build_target(features: &str) -> Result<String> {
     } else {
         format!("{ext_base}/{}", features.replace(" ", "_"))
     };
-    let bin = format!("target/{target_ext}/release/rsu");
+    let bin = format!("target/{target_ext}/release/docker-test");
 
     BUILD_LOCK.call_once(|| { build_in_container(&target_ext).unwrap(); } );
 
