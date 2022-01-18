@@ -8,9 +8,7 @@ development machine (e.g. `chmod` to root or enabling `setuid`).
 Right now it is somewhat specific to my use-cases, but may be of use to others.
 
 ```rust
-
 use docker_test::*;
-
 
 #[test]
 fn help() {
@@ -29,7 +27,6 @@ fn not_root() {
     assert!(String::from_utf8(out.stderr).unwrap()
             .contains("Error: Not running as root"));
 }
-
 ```
 
 See https://github.com/tarka/rsu/blob/main/tests/lib.rs for an example of use.
