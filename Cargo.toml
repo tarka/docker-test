@@ -2,8 +2,13 @@
 name = "docker-test"
 description = "A small helper library to build and run Rust applications in Docker"
 version = "0.1.0"
-authors = ["Steve Smith <tarkasteve@gmail.com>"]
 license = "MPL-2.0"
+
+authors = ["Steve Smith <tarkasteve@gmail.com>"]
+homepage = "https://github.com/tarka/docker-test/"
+repository = "https://github.com/tarka/docker-test/"
+readme = "README.md"
+
 edition = "2021"
 
 [dependencies]
