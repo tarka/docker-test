@@ -8,11 +8,11 @@ development machine (e.g. `chmod` to root or enabling `setuid`).
 Right now it is somewhat specific to my use-cases, but may be of use to others.
 
 ```rust
-use docker_test::*;
+use docker_test as dt;
 
 #[test]
 fn help() {
-    let container = setup("rsu", None).unwrap();
+    let container = dt::setup("rsu", None).unwrap();
     let out = container.exec(vec![container.dest_str(), "--help"]).unwrap();
     let stdout = String::from_utf8(out.stdout).unwrap();
     assert!(out.status.success());
@@ -21,8 +21,8 @@ fn help() {
 
 #[test]
 fn not_root() {
-    let container = setup("rsu", None).unwrap();
-    let out = container.exec_as(TESTUSER, vec![container.dest_str(), "/bin/ls"]).unwrap();
+    let container = dt::setup("rsu", None).unwrap();
+    let out = container.exec_as(dt::TESTUSER, vec![container.dest_str(), "/bin/ls"]).unwrap();
     assert!(!out.status.success());
     assert!(String::from_utf8(out.stderr).unwrap()
             .contains("Error: Not running as root"));
