@@ -1,4 +1,9 @@
 
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
 
 use anyhow::Error;
 use camino::Utf8PathBuf as PathBuf;
@@ -150,7 +155,7 @@ fn build_target(bin_name: &str, features: Option<&str>) -> Result<PathBuf> {
 }
 
 pub fn setup(bin_name: &str, features: Option<&str>) -> Result<Container> {
-    let bin_path = build_target(bin_name, None)?;
+    let bin_path = build_target(bin_name, features)?;
 
     let container = Container::new(bin_path)?;
 
