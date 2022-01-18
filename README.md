@@ -28,5 +28,3 @@ fn not_root() {
             .contains("Error: Not running as root"));
 }
 ```
-
-See https://github.com/tarka/rsu/blob/main/tests/lib.rs for an example of use.
