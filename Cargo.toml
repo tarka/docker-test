@@ -1,5 +1,6 @@
 [package]
 name = "docker-test"
+description = "A small helper library to build and run Rust applications in Docker"
 version = "0.1.0"
 authors = ["Steve Smith <tarkasteve@gmail.com>"]
 license = "MPL-2.0"
