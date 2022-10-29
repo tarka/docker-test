@@ -6,7 +6,7 @@
  */
 
 use anyhow::Error;
-use camino::Utf8PathBuf as PathBuf;
+use camino::{Utf8PathBuf as PathBuf};
 use libc;
 use std::env;
 use std::process::{Command, Output};
@@ -114,17 +114,16 @@ fn getids() -> (u32, u32) {
 static BUILD_LOCK: Once = Once::new();
 
 // FIXME: Could merge this with Container, but not worth it ATM.
-fn build_in_container(target_ext: &str, features: &str) -> Result<Output> {
+fn build_in_container(target_ext: &str, projdir: &str, features: &str) -> Result<Output> {
     // See https://hub.docker.com/_/rust
     // docker run --rm --user "$(id -u)":"$(id -g)" -v "$PWD":/usr/src/myapp -w /usr/src/myapp rust:1.23.0 cargo build --release
 
     let (uid, gid) = getids();
-    let pwd = env::var("PWD")?;
     let builddir = "/usr/src";
     let target_base = format!("{builddir}/target");
     let imgtarget = format!("{target_base}/{target_ext}");
     let user = format!("{uid}:{gid}");
-    let volume = format!("{pwd}:{builddir}");
+    let volume = format!("{projdir}:{builddir}");
     let cargo_env = format!("CARGO_HOME={target_base}/.cargo");
 
     let cargo_cli = vec!["cargo", "build", "--release",
@@ -143,19 +142,26 @@ fn build_in_container(target_ext: &str, features: &str) -> Result<Output> {
     Ok(out)
 }
 
-fn build_target(bin_name: &str, features: Option<&str>) -> Result<PathBuf> {
+fn build_target(bin_name: &str, projdir: &str, features: Option<&str>) -> Result<PathBuf> {
     let ext_base = "docker";
     let fstr = features.unwrap_or("");
     let target_ext = format!("{ext_base}/{}", fstr.replace(" ", "_"));
 
-    BUILD_LOCK.call_once(|| { build_in_container(&target_ext, fstr).unwrap(); } );
+    BUILD_LOCK.call_once(|| { build_in_container(&target_ext, projdir, fstr).unwrap(); } );
 
-    let bin = PathBuf::from(format!("target/{target_ext}/release/{bin_name}"));
+    let bin = PathBuf::from(format!("{projdir}/target/{target_ext}/release/{bin_name}"));
     Ok(bin)
 }
 
-pub fn setup(bin_name: &str, features: Option<&str>) -> Result<Container> {
-    let bin_path = build_target(bin_name, features)?;
+pub fn setup(bin_name: &str, projdir: Option<&str>, features: Option<&str>) -> Result<Container> {
+    let pwd = env::var("PWD")?;
+    let pd = if let Some(pd) = projdir {
+        format!("{pwd}/{pd}")
+    } else {
+        pwd
+    };
+
+    let bin_path = build_target(bin_name, &pd, features)?;
 
     let container = Container::new(bin_path)?;
 
