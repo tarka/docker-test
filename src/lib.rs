@@ -16,7 +16,6 @@ use std::sync::Once;
 
 pub type Result<T> = result::Result<T, Error>;
 
-pub const BUILD_IMAGE: &str = "rust:1.58-slim-bullseye";
 pub const DOCKER_IMAGE: &str = "debian:bullseye-slim";
 pub const TESTUSER: &str = "testuser";
 pub const TESTPASS: &str = "testpass";
@@ -114,9 +113,11 @@ fn getids() -> (u32, u32) {
 static BUILD_LOCK: Once = Once::new();
 
 // FIXME: Could merge this with Container, but not worth it ATM.
-fn build_in_container(target_ext: &str, projdir: &str, features: &str) -> Result<Output> {
+fn build_in_container(target_ext: &str, projdir: &str, features: &str, rust_ver: &str) -> Result<Output> {
     // See https://hub.docker.com/_/rust
     // docker run --rm --user "$(id -u)":"$(id -g)" -v "$PWD":/usr/src/myapp -w /usr/src/myapp rust:1.23.0 cargo build --release
+
+    let build_image = format!("rust:{rust_ver}-slim-bullseye");
 
     let (uid, gid) = getids();
     let builddir = "/usr/src";
@@ -135,25 +136,25 @@ fn build_in_container(target_ext: &str, projdir: &str, features: &str) -> Result
                           "--volume", volume.as_str(),
                           "--workdir", builddir,
                           "--env", cargo_env.as_str(),
-                          BUILD_IMAGE];
+                          build_image.as_str()];
 
     let out = docker([docker_cli, cargo_cli].concat())?;
 
     Ok(out)
 }
 
-fn build_target(bin_name: &str, projdir: &str, features: Option<&str>) -> Result<PathBuf> {
+fn build_target(bin_name: &str, projdir: &str, features: Option<&str>, rust_ver: &str) -> Result<PathBuf> {
     let ext_base = "docker";
     let fstr = features.unwrap_or("");
     let target_ext = format!("{ext_base}/{}", fstr.replace(" ", "_"));
 
-    BUILD_LOCK.call_once(|| { build_in_container(&target_ext, projdir, fstr).unwrap(); } );
+    BUILD_LOCK.call_once(|| { build_in_container(&target_ext, projdir, fstr, rust_ver).unwrap(); } );
 
     let bin = PathBuf::from(format!("{projdir}/target/{target_ext}/release/{bin_name}"));
     Ok(bin)
 }
 
-pub fn setup(bin_name: &str, projdir: Option<&str>, features: Option<&str>) -> Result<Container> {
+pub fn setup(bin_name: &str, projdir: Option<&str>, features: Option<&str>, rust_ver: &str) -> Result<Container> {
     let pwd = env::var("PWD")?;
     let pd = if let Some(pd) = projdir {
         format!("{pwd}/{pd}")
@@ -161,7 +162,7 @@ pub fn setup(bin_name: &str, projdir: Option<&str>, features: Option<&str>) -> R
         pwd
     };
 
-    let bin_path = build_target(bin_name, &pd, features)?;
+    let bin_path = build_target(bin_name, &pd, features, rust_ver)?;
 
     let container = Container::new(bin_path)?;
 
