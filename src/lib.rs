@@ -17,8 +17,6 @@ use std::sync::Once;
 pub type Result<T> = result::Result<T, Error>;
 
 pub const DOCKER_IMAGE: &str = "debian:bullseye-slim";
-pub const TESTUSER: &str = "testuser";
-pub const TESTPASS: &str = "testpass";
 
 pub fn docker(cmd: Vec<&str>) -> Result<Output> {
     let out = Command::new("docker")
@@ -33,34 +31,32 @@ pub fn docker(cmd: Vec<&str>) -> Result<Output> {
 }
 
 pub struct Container {
-    src_bin: PathBuf,
-    dest_bin: PathBuf,
     id: String,
 }
 
 impl Container {
-    pub fn new(src_bin: PathBuf) -> Result<Self> {
+    pub fn new() -> Result<Self> {
         let running = docker(vec!["run", "--detach", DOCKER_IMAGE, "sleep", "15m"])?;
-
-        let bin = src_bin.components().last().unwrap();
-        let dest_base: PathBuf = PathBuf::from("/usr/local/bin");
-        let dest_bin = dest_base.join(bin);
-
         let container = Container {
-            src_bin,
-            dest_bin,
             id: String::from_utf8(running.stdout)?.trim().to_string()
         };
-
         Ok(container)
     }
 
-    pub fn src_str(&self) -> &str {
-        self.src_bin.as_str()
+    pub fn binary_path(&self, src_bin: &PathBuf) -> Result<PathBuf> {
+        let bin = src_bin.components().last().unwrap();
+        let dest_base = PathBuf::from("/usr/local/bin");
+        let dest_bin = dest_base.join(bin);
+        Ok(dest_bin)
     }
 
-    pub fn dest_str(&self) -> &str {
-        self.dest_bin.as_str()
+    pub fn copy_binary(&self, src_bin: &PathBuf) -> Result<PathBuf> {
+        let dest_bin = self.binary_path(src_bin)?;
+
+        let _out = self.cp(src_bin.as_str(), dest_bin.as_str())?;
+        self.exec(vec!["chmod", "755", dest_bin.as_str()])?;
+
+        Ok(dest_bin)
     }
 
     pub fn kill(&self) -> Result<()> {
@@ -94,6 +90,9 @@ impl Container {
     pub fn cp(self: &Self, from: &str, to: &str) -> Result<Output> {
         let remote = format!("{}:{}", self.id, to);
         let out = docker(vec!["cp", from, remote.as_str()])?;
+        if !out.status.success() {
+            anyhow::bail!("Copy of {} to {} failed", from, remote);
+        }
         Ok(out)
     }
 
@@ -104,6 +103,7 @@ impl Drop for Container {
         self.kill().unwrap();
     }
 }
+
 
 fn getids() -> (u32, u32) {
     unsafe { (libc::geteuid(), libc::getegid()) }
@@ -143,7 +143,7 @@ fn build_in_container(target_ext: &str, projdir: &str, features: &str, rust_ver:
     Ok(out)
 }
 
-fn build_target(bin_name: &str, projdir: &str, features: Option<&str>, rust_ver: &str) -> Result<PathBuf> {
+pub fn build_target(bin_name: &str, projdir: &str, features: Option<&str>, rust_ver: &str) -> Result<PathBuf> {
     let ext_base = "docker";
     let fstr = features.unwrap_or("");
     let target_ext = format!("{ext_base}/{}", fstr.replace(" ", "_"));
@@ -154,26 +154,3 @@ fn build_target(bin_name: &str, projdir: &str, features: Option<&str>, rust_ver:
     Ok(bin)
 }
 
-pub fn setup(bin_name: &str, projdir: Option<&str>, features: Option<&str>, rust_ver: &str) -> Result<Container> {
-    let pwd = env::var("PWD")?;
-    let pd = if let Some(pd) = projdir {
-        format!("{pwd}/{pd}")
-    } else {
-        pwd
-    };
-
-    let bin_path = build_target(bin_name, &pd, features, rust_ver)?;
-
-    let container = Container::new(bin_path)?;
-
-    // FIXME: move to new?
-    container.cp(container.src_bin.as_str(), container.dest_str())?;
-    container.exec(vec!["chown", "root.root", container.dest_str()])?;
-    container.exec(vec!["chmod", "755", container.dest_str()])?;
-
-    container.exec(vec!["adduser", "--disabled-password", TESTUSER])?;
-    container.exec(vec!["echo", format!("{}\n{}\n", TESTPASS, TESTPASS).as_str(), "|", "passwd", TESTUSER])?;
-    container.exec(vec!["addgroup", "--system", "sudoers"])?;
-
-    Ok(container)
-}
