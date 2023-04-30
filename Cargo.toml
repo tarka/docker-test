@@ -1,6 +1,6 @@
 [package]
 name = "docker-test"
-description = "A small helper library to build and run Rust applications in Docker"
+description = "A small helper library to build and run Rust applications in Docker (podman)"
 version = "0.2.0"
 license = "MPL-2.0"
 
@@ -15,4 +15,3 @@ edition = "2021"
 anyhow = "1.0.70"
 camino = "1.1.4"
 cfg-if = "1.0.0"
-libc = "0.2.142"

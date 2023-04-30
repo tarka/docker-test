@@ -6,9 +6,7 @@
  */
 
 use anyhow::Error;
-use camino::{Utf8PathBuf as PathBuf};
-use libc;
-use std::env;
+use camino::Utf8PathBuf as PathBuf;
 use std::process::{Command, Output};
 use std::result;
 use std::sync::Once;
@@ -16,10 +14,12 @@ use std::sync::Once;
 
 pub type Result<T> = result::Result<T, Error>;
 
-pub const DOCKER_IMAGE: &str = "debian:bullseye-slim";
+pub const DOCKER_IMAGE: &str = "docker.io/debian:bullseye-slim";
+pub const DOCKER_CMD: &str = "podman";
 
 pub fn docker(cmd: Vec<&str>) -> Result<Output> {
-    let out = Command::new("docker")
+    println!("CMD: {:?}", cmd);
+    let out = Command::new(DOCKER_CMD)
         .args(cmd)
         .output()?;
     let stdout = String::from_utf8(out.clone().stdout).unwrap();
@@ -69,7 +69,7 @@ impl Container {
     }
 
     pub fn exec_as(self: &Self, user: &str, cmd: Vec<&str>) -> Result<Output> {
-        let out = Command::new("docker")
+        let out = Command::new(DOCKER_CMD)
             .arg("exec")
             .arg("--user").arg(user)
             .arg("-i")
@@ -105,25 +105,15 @@ impl Drop for Container {
 }
 
 
-fn getids() -> (u32, u32) {
-    unsafe { (libc::geteuid(), libc::getegid()) }
-}
-
-
 static BUILD_LOCK: Once = Once::new();
 
 // FIXME: Could merge this with Container, but not worth it ATM.
 fn build_in_container(target_ext: &str, projdir: &str, features: &str, rust_ver: &str) -> Result<Output> {
-    // See https://hub.docker.com/_/rust
-    // docker run --rm --user "$(id -u)":"$(id -g)" -v "$PWD":/usr/src/myapp -w /usr/src/myapp rust:1.23.0 cargo build --release
+     let build_image = format!("docker.io/rust:{rust_ver}-slim-bullseye");
 
-    let build_image = format!("rust:{rust_ver}-slim-bullseye");
-
-    let (uid, gid) = getids();
-    let builddir = "/usr/src";
+    let builddir = "/tmp/src";
     let target_base = format!("{builddir}/target");
     let imgtarget = format!("{target_base}/{target_ext}");
-    let user = format!("{uid}:{gid}");
     let volume = format!("{projdir}:{builddir}");
     let cargo_env = format!("CARGO_HOME={target_base}/.cargo");
 
@@ -132,7 +122,6 @@ fn build_in_container(target_ext: &str, projdir: &str, features: &str, rust_ver:
                          "--target-dir", imgtarget.as_str()];
 
     let docker_cli = vec!["run", "--rm",
-                          "--user", user.as_str(),
                           "--volume", volume.as_str(),
                           "--workdir", builddir,
                           "--env", cargo_env.as_str(),
@@ -153,4 +142,3 @@ pub fn build_target(bin_name: &str, projdir: &str, features: Option<&str>, rust_
     let bin = PathBuf::from(format!("{projdir}/target/{target_ext}/release/{bin_name}"));
     Ok(bin)
 }
-
