@@ -22,7 +22,7 @@ fn setup(bin_name: &str, projdir: Option<&str>, features: Option<&str>, rust_ver
 
 #[test]
 fn build_run() {
-    let (container, bin) = setup("testproj", Some("testproj"), None, "1.64.0").unwrap();
+    let (container, bin) = setup("testproj", Some("tests/testproj"), None, "1.64.0").unwrap();
     let out = container.exec(vec![bin.as_str(), "--help"]).unwrap();
     let stdout = String::from_utf8(out.stdout).unwrap();
     assert!(out.status.success());
@@ -31,7 +31,7 @@ fn build_run() {
 
 #[test]
 fn not_root() {
-    let (container, bin) = setup("testproj", Some("testproj"), None, "1.64.0").unwrap();
+    let (container, bin) = setup("testproj", Some("tests/testproj"), None, "1.64.0").unwrap();
     let out = container.exec_as("nobody", vec![bin.as_str(), "--help"]).unwrap();
     let stdout = String::from_utf8(out.stdout).unwrap();
     assert!(out.status.success());
