@@ -111,7 +111,7 @@ static BUILD_LOCK: Once = Once::new();
 fn build_in_container(target_ext: &str, projdir: &str, features: &str, rust_ver: &str) -> Result<Output> {
      let build_image = format!("docker.io/rust:{rust_ver}-slim-bullseye");
 
-    let builddir = "/tmp/src";
+    let builddir = "/opt/src";
     let target_base = format!("{builddir}/target");
     let imgtarget = format!("{target_base}/{target_ext}");
     let volume = format!("{projdir}:{builddir}");
