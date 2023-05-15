@@ -57,6 +57,7 @@ pub fn build_image(dir: &str, name: &str) -> Result<String> {
         .last()
         .ok_or(anyhow!("No output from build command"))?;
 
+    println!("BUILD IMAGE ID: '{}'", id);
     Ok(id.to_string())
 }
 
