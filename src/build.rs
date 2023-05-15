@@ -53,3 +53,9 @@ pub fn build_image(dir: &str, name: &str) -> Result<()> {
     Ok(())
 }
 
+static IMAGE_BUILD_LOCK: Once = Once::new();
+
+pub fn build_image_sync(dir: &str, name: &str) -> Result<String> {
+    IMAGE_BUILD_LOCK.call_once(|| build_image(dir, name).unwrap());
+    Ok(name.to_string())
+}

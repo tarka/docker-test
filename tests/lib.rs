@@ -1,15 +1,10 @@
 
-use std::sync::Once;
-
-use docker_test::{util::build_and_deploy, build::build_image, Result};
-
-static IMAGE_BUILD_LOCK: Once = Once::new();
+use docker_test::{util::build_and_deploy, build::build_image_sync, Result};
 
 fn build_test_image() -> Result<String> {
     let dir = "tests/custom-container";
     let name = "docker-test-self-test-image";
-    IMAGE_BUILD_LOCK.call_once(|| build_image(dir, name).unwrap());
-    Ok(name.to_string())
+    build_image_sync(dir, name)
 }
 
 #[test]
