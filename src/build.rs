@@ -44,3 +44,12 @@ pub fn build_target(bin_name: &str, projdir: &str, features: Option<&str>, image
     let bin = PathBuf::from(format!("{projdir}/target/{target_ext}/release/{bin_name}"));
     Ok(bin)
 }
+
+pub fn build_image(dir: &str, name: &str) -> Result<()> {
+    let cli = vec!["build", "--tag", name, dir];
+
+    let _out = cmd(cli)?;
+
+    Ok(())
+}
+
