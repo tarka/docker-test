@@ -1,7 +1,10 @@
 
 use std::process::Output;
 use std::sync::Once;
+use anyhow::anyhow;
 use camino::Utf8PathBuf as PathBuf;
+use once_cell::sync::Lazy;
+use quick_cache::{sync::Cache, GuardResult};
 
 use crate::{cmd, Result};
 
@@ -30,7 +33,7 @@ pub fn build_in_container(target_ext: &str, projdir: &str, features: &str, image
 }
 
 
-static BUILD_LOCK: Once = Once::new();
+static APP_BUILD_LOCK: Once = Once::new();
 
 // Build a project in a rust container. Uses locking to ensure
 // concurrent test runs share a common build.
@@ -39,23 +42,36 @@ pub fn build_target(bin_name: &str, projdir: &str, features: Option<&str>, image
     let fstr = features.unwrap_or("");
     let target_ext = format!("{ext_base}/{}", fstr.replace(" ", "_"));
 
-    BUILD_LOCK.call_once(|| { build_in_container(&target_ext, projdir, fstr, image).unwrap(); } );
+    APP_BUILD_LOCK.call_once(|| { build_in_container(&target_ext, projdir, fstr, image).unwrap(); } );
 
     let bin = PathBuf::from(format!("{projdir}/target/{target_ext}/release/{bin_name}"));
     Ok(bin)
 }
 
-pub fn build_image(dir: &str, name: &str) -> Result<()> {
+pub fn build_image(dir: &str, name: &str) -> Result<String> {
     let cli = vec!["build", "--tag", name, dir];
 
-    let _out = cmd(cli)?;
+    let out = cmd(cli)?;
+    let stdout = String::from_utf8(out.stdout)?;
+    let id = stdout.lines()
+        .last()
+        .ok_or(anyhow!("No output from build command"))?;
 
-    Ok(())
+    Ok(id.to_string())
 }
 
-static IMAGE_BUILD_LOCK: Once = Once::new();
+
+static IMAGE_CACHE: Lazy<Cache<String, String>> = Lazy::new(|| Cache::new(16) );
 
 pub fn build_image_sync(dir: &str, name: &str) -> Result<String> {
-    IMAGE_BUILD_LOCK.call_once(|| build_image(dir, name).unwrap());
-    Ok(name.to_string())
+    let key = format!("{}-{}", dir, name);
+    match IMAGE_CACHE.get_value_or_guard(&key, None) {
+        GuardResult::Timeout => Err(anyhow!("Unexpected timeout building base image")),
+        GuardResult::Value(val) => Ok(val),
+        GuardResult::Guard(guard) => {
+            let id = build_image(dir, name)?;
+            guard.insert(id.clone());
+            Ok(id)
+        }
+    }
 }
