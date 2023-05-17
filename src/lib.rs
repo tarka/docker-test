@@ -1,4 +1,3 @@
-
 /*
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -13,7 +12,6 @@ use camino::Utf8PathBuf as PathBuf;
 use std::process::{Command, Output};
 use std::result;
 
-
 pub type Result<T> = result::Result<T, Error>;
 
 pub const DOCKER_IMAGE: &str = "docker.io/debian:bullseye-slim";
@@ -22,9 +20,7 @@ pub const DOCKER_CMD: &str = "podman";
 // FIXME: Should probably used the Podman API
 pub fn cmd(args: Vec<&str>) -> Result<Output> {
     println!("CMD: {:?}", args);
-    let out = Command::new(DOCKER_CMD)
-        .args(args)
-        .output()?;
+    let out = Command::new(DOCKER_CMD).args(args).output()?;
     let stdout = String::from_utf8(out.clone().stdout).unwrap();
     let stderr = String::from_utf8(out.clone().stderr).unwrap();
     println!("STDOUT: {stdout}");
@@ -41,7 +37,7 @@ impl Container {
     pub fn new() -> Result<Self> {
         let running = cmd(vec!["run", "--detach", DOCKER_IMAGE, "sleep", "15m"])?;
         let container = Container {
-            id: String::from_utf8(running.stdout)?.trim().to_string()
+            id: String::from_utf8(running.stdout)?.trim().to_string(),
         };
         Ok(container)
     }
@@ -74,7 +70,8 @@ impl Container {
     pub fn exec_as(self: &Self, user: &str, cmd: Vec<&str>) -> Result<Output> {
         let out = Command::new(DOCKER_CMD)
             .arg("exec")
-            .arg("--user").arg(user)
+            .arg("--user")
+            .arg(user)
             .arg("-i")
             .arg(&self.id)
             .args(cmd)
@@ -82,8 +79,12 @@ impl Container {
         Ok(out)
     }
 
-    pub fn exec_w_pass<'a>(self: &Self, user: &'a str, pass: &'a str, mut cmd: Vec<&'a str>) -> Result<Output>
-    {
+    pub fn exec_w_pass<'a>(
+        self: &Self,
+        user: &'a str,
+        pass: &'a str,
+        mut cmd: Vec<&'a str>,
+    ) -> Result<Output> {
         let mut ncmd = vec!["echo", pass, "|"];
         ncmd.append(&mut cmd);
         let out = self.exec_as(user, ncmd)?;
@@ -98,7 +99,6 @@ impl Container {
         }
         Ok(out)
     }
-
 }
 
 impl Drop for Container {

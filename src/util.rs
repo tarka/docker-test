@@ -1,13 +1,16 @@
-
+use camino::Utf8PathBuf as PathBuf;
 use std::env;
-use camino::{Utf8PathBuf as PathBuf};
 
-use crate::{Container, Result, build::build_target};
-
+use crate::{build::build_target, Container, Result};
 
 // Builds a project in a rust container, then copies the resulting
 // binary to a new running container.
-pub fn build_and_deploy(bin_name: &str, projdir: Option<&str>, features: Option<&str>, image: &str) -> Result<(Container, PathBuf)> {
+pub fn build_and_deploy(
+    bin_name: &str,
+    projdir: Option<&str>,
+    features: Option<&str>,
+    image: &str,
+) -> Result<(Container, PathBuf)> {
     let pwd = env::var("PWD")?;
     let pd = if let Some(pd) = projdir {
         format!("{pwd}/{pd}")
