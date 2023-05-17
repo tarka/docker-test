@@ -8,6 +8,12 @@ perform locally on a development machine (e.g. `chmod` to root or enabling
 
 Right now it is somewhat specific to my use-cases, but may be of use to others.
 
+## Feature flags
+
+* `docker`: Uses `docker` instead of `podman`.
+
+## Example
+
 ```rust
 use docker_test::{build::build_image_sync, util::build_and_deploy};
 

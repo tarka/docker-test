@@ -9,13 +9,22 @@ pub mod util;
 
 use anyhow::Error;
 use camino::Utf8PathBuf as PathBuf;
+use cfg_if::cfg_if;
 use std::process::{Command, Output};
 use std::result;
 
 pub type Result<T> = result::Result<T, Error>;
 
 pub const DOCKER_IMAGE: &str = "docker.io/debian:bullseye-slim";
-pub const DOCKER_CMD: &str = "podman";
+
+cfg_if! {
+    if #[cfg(feature = "docker")] {
+        pub const DOCKER_CMD: &str = "docker";
+    } else {
+        pub const DOCKER_CMD: &str = "podman";
+    }
+
+}
 
 // FIXME: Should probably used the Podman API
 pub fn cmd(args: Vec<&str>) -> Result<Output> {
