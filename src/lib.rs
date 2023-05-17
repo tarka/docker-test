@@ -19,6 +19,7 @@ pub type Result<T> = result::Result<T, Error>;
 pub const DOCKER_IMAGE: &str = "docker.io/debian:bullseye-slim";
 pub const DOCKER_CMD: &str = "podman";
 
+// FIXME: Should probably used the Podman API
 pub fn cmd(args: Vec<&str>) -> Result<Output> {
     println!("CMD: {:?}", args);
     let out = Command::new(DOCKER_CMD)

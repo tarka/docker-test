@@ -5,4 +5,4 @@ authors = ["Steve Smith <tarkasteve@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-openssl = "0.10.52"
+nix = "0.26.2"
